@@ -2,7 +2,7 @@ import math
 
 import torch.nn as nn
 
-from lib.DCNv2.dcn_v2 import DCN
+# from lib.DCNv2.dcn_v2 import DCN
 import torch.utils.model_zoo as model_zoo
 
 BN_MOMENTUM = 0.1

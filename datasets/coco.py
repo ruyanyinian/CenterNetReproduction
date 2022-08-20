@@ -86,7 +86,7 @@ class COCO(data.Dataset):
     print('Loaded %d %s samples' % (self.num_samples, split))
 
   def __getitem__(self, index):
-    img_id = self.images[index]
+    img_id = self.images[index] # index = 24836
     img_path = os.path.join(self.img_dir, self.coco.loadImgs(ids=[img_id])[0]['file_name'])
     ann_ids = self.coco.getAnnIds(imgIds=[img_id])
     annotations = self.coco.loadAnns(ids=ann_ids)
@@ -141,14 +141,14 @@ class COCO(data.Dataset):
     img -= self.mean
     img /= self.std
     img = img.transpose(2, 0, 1)  # from [H, W, C] to [C, H, W]
-
+    # 这一步是什么意思
     trans_fmap = get_affine_transform(center, scale, 0, [self.fmap_size['w'], self.fmap_size['h']])
 
-    hmap = np.zeros((self.num_classes, self.fmap_size['h'], self.fmap_size['w']), dtype=np.float32)  # heatmap
-    w_h_ = np.zeros((self.max_objs, 2), dtype=np.float32)  # width and height
-    regs = np.zeros((self.max_objs, 2), dtype=np.float32)  # regression
-    inds = np.zeros((self.max_objs,), dtype=np.int64)
-    ind_masks = np.zeros((self.max_objs,), dtype=np.uint8)
+    hmap = np.zeros((self.num_classes, self.fmap_size['h'], self.fmap_size['w']), dtype=np.float32)  # (1,80,128,128)  # heatmap
+    w_h_ = np.zeros((self.max_objs, 2), dtype=np.float32)  # width and height, (128,2)
+    regs = np.zeros((self.max_objs, 2), dtype=np.float32)  # regression, (128,2)
+    inds = np.zeros((self.max_objs,), dtype=np.int64) # (128)
+    ind_masks = np.zeros((self.max_objs,), dtype=np.uint8) # (128)
 
     # detections = []
     for k, (bbox, label) in enumerate(zip(bboxes, labels)):

@@ -138,14 +138,17 @@ class exkp(nn.Module):
     self.relu = nn.ReLU(inplace=True)
 
   def forward(self, image):
-    inter = self.pre(image)
+    inter = self.pre(image) # (1,256,128,128)
 
     outs = []
-    for ind in range(self.nstack):
-      kp = self.kps[ind](inter)
-      cnv = self.cnvs[ind](kp)
+    for ind in range(self.nstack):  # nstack=1
+      kp = self.kps[ind](inter) # (1,256,128,128)
+      cnv = self.cnvs[ind](kp) # (1,256,128,128)
 
       if self.training or ind == self.nstack - 1:
+        # outputs[0]: (1,80,128,128)
+        # outputs[1]: (1,2,128,128)
+        # outputs[3]: (1,2,128,128)
         outs.append([self.hmap[ind](cnv), self.regs[ind](cnv), self.w_h_[ind](cnv)])
 
       if ind < self.nstack - 1:
