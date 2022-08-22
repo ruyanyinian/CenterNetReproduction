@@ -14,6 +14,12 @@ import torch.nn as nn
 import torch.utils.data
 import torch.distributed as dist
 
+torch.manual_seed(1)
+torch.cuda.manual_seed_all(1)
+torch.cuda.manual_seed(1)
+np.random.seed(1)
+# random.seed(1)
+# cudnn.deterministic = True
 from datasets.coco import COCO, COCO_eval
 from datasets.pascal import PascalVOC, PascalVOC_eval
 
@@ -75,7 +81,6 @@ def main():
   print = logger.info
   print(cfg)
 
-  torch.manual_seed(317)
   torch.backends.cudnn.benchmark = True  # disable this if OOM at beginning of training
 
   num_gpus = torch.cuda.device_count()
@@ -141,10 +146,11 @@ def main():
           batch[k] = batch[k].to(device=cfg.device, non_blocking=True)
 
       outputs = model(batch['image']) # (1,80,128,128) (1,2,128,128) (1,2,128,128)
-      hmap, regs, w_h_ = zip(*outputs)
+      hmap, regs, w_h_ = zip(*outputs) # 模型的输出
       regs = [_tranpose_and_gather_feature(r, batch['inds']) for r in regs]
       w_h_ = [_tranpose_and_gather_feature(r, batch['inds']) for r in w_h_]
 
+      # 计算loss
       hmap_loss = _neg_loss(hmap, batch['hmap'])
       reg_loss = _reg_loss(regs, batch['regs'], batch['ind_masks'])
       w_h_loss = _reg_loss(w_h_, batch['w_h_'], batch['ind_masks'])

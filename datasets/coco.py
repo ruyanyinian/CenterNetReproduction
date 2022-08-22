@@ -99,15 +99,20 @@ class COCO(data.Dataset):
 
     img = cv2.imread(img_path)
     height, width = img.shape[0], img.shape[1]
-    center = np.array([width / 2., height / 2.], dtype=np.float32)  # center of image
+    # center of image, 注意这个只是图像的中心点, 并不是待检测物体的中心点
+    center = np.array([width / 2., height / 2.], dtype=np.float32)
     scale = max(height, width) * 1.0
 
     flipped = False
     if self.split == 'train':
       scale = scale * np.random.choice(self.rand_scales)
-      w_border = get_border(128, width)
-      h_border = get_border(128, height)
+      # get_border作用是当图片的w/h大于256时，便返回128，否则返回64，意思是图片较大时返回128，较小是返回64，然后center便是其选定的中心点
+      # 解释链接 https://blog.csdn.net/qq_37690498/article/details/106976743
+      w_border = get_border(128, width)  # w_border:128
+      h_border = get_border(128, height)  # h_border:128
+      # low=128, high=352 为什么需要在(128, 352)之间选中一个随机的值呢? 这里的center也不会进行训练所以也没什么关系。
       center[0] = np.random.randint(low=w_border, high=width - w_border)
+      # low=128, high=512, 为什么在(128, 512)之间选中一个随机值呢?
       center[1] = np.random.randint(low=h_border, high=height - h_border)
 
       if np.random.random() < 0.5:
@@ -141,16 +146,18 @@ class COCO(data.Dataset):
     img -= self.mean
     img /= self.std
     img = img.transpose(2, 0, 1)  # from [H, W, C] to [C, H, W]
-    # 这一步是什么意思
+    # 这一步是什么意思, 这个应该是数据增强.
     trans_fmap = get_affine_transform(center, scale, 0, [self.fmap_size['w'], self.fmap_size['h']])
 
     hmap = np.zeros((self.num_classes, self.fmap_size['h'], self.fmap_size['w']), dtype=np.float32)  # (1,80,128,128)  # heatmap
-    w_h_ = np.zeros((self.max_objs, 2), dtype=np.float32)  # width and height, (128,2)
+    w_h_ = np.zeros((self.max_objs, 2), dtype=np.float32)  # width and height, (128,2), 为什么用self.max_objs去构建输出呢?
     regs = np.zeros((self.max_objs, 2), dtype=np.float32)  # regression, (128,2)
-    inds = np.zeros((self.max_objs,), dtype=np.int64) # (128)
-    ind_masks = np.zeros((self.max_objs,), dtype=np.uint8) # (128)
+    # 假设是128个待检测的物体, 那么inds记录的是128个待检测物体的ind
+    inds = np.zeros((self.max_objs,), dtype=np.int64)
+    ind_masks = np.zeros((self.max_objs,), dtype=np.uint8) # (128), 这个是128个待检测物体的index_mask
 
     # detections = []
+    # bboxes=(7,4)
     for k, (bbox, label) in enumerate(zip(bboxes, labels)):
       if flipped:
         bbox[[0, 2]] = width - bbox[[2, 0]] - 1
@@ -158,13 +165,13 @@ class COCO(data.Dataset):
       bbox[2:] = affine_transform(bbox[2:], trans_fmap)
       bbox[[0, 2]] = np.clip(bbox[[0, 2]], 0, self.fmap_size['w'] - 1)
       bbox[[1, 3]] = np.clip(bbox[[1, 3]], 0, self.fmap_size['h'] - 1)
-      h, w = bbox[3] - bbox[1], bbox[2] - bbox[0]
+      h, w = bbox[3] - bbox[1], bbox[2] - bbox[0] # 这个是待检测物体的w和h
       if h > 0 and w > 0:
-        obj_c = np.array([(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2], dtype=np.float32)
-        obj_c_int = obj_c.astype(np.int32)
-
+        obj_c = np.array([(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2], dtype=np.float32) # 这个是待检测物体的中心点
+        obj_c_int = obj_c.astype(np.int32) # (39, 57)
+        # self_gaussian_iou = 0.7, h = 15.22, w = 19.50, radius = 1
         radius = max(0, int(gaussian_radius((math.ceil(h), math.ceil(w)), self.gaussian_iou)))
-        draw_umich_gaussian(hmap[label], obj_c_int, radius)
+        draw_umich_gaussian(hmap[label], obj_c_int, radius) # obj_c_int(39,57)
         w_h_[k] = 1. * w, 1. * h
         regs[k] = obj_c - obj_c_int  # discretization error
         inds[k] = obj_c_int[1] * self.fmap_size['w'] + obj_c_int[0]
